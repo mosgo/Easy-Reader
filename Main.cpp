@@ -31,11 +31,11 @@ public:
         auto end = std::chrono::system_clock::now();
 
         std::chrono::duration<double> elapsed_seconds = end - start;
-        std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+        end_time = std::chrono::system_clock::to_time_t(end);
 
 
         wxString news = NewsReader();
-        wxString output("Welcome to News!\nDownloading News... \n <-----------------------------> \n" + news);
+        wxString output("Welcome to News!\nDownloading News... \n <-------------------------------------------------> \n" + news);
         // Prints time string
         wxString timeData = wxString(std::ctime(&end_time)) + "\n";
 
@@ -57,11 +57,11 @@ public:
             wxTE_MULTILINE | wxTE_READONLY | wxHSCROLL
         );
 
-        wxStaticText* timeBox = new wxStaticText(
+        timeBox = new wxTextCtrl(
             panel, wxID_ANY, timeData,
-            wxPoint(10, 550), wxSize(200, 100),
-            wxTE_MULTILINE | wxTE_READONLY | wxHSCROLL
-		);
+            wxPoint(10, 550), wxSize(200, 25),
+            wxTE_MULTILINE | wxTE_READONLY
+        );
 
         wxButton* button = new wxButton(
             panel, wxID_ANY, "Refresh", wxPoint(550, 550)
@@ -81,6 +81,8 @@ public:
         wxBoxSizer* newsSelector = new wxBoxSizer(wxHORIZONTAL);
 
         button->Bind(wxEVT_BUTTON, &App::OnRefresh, this);
+		BBCButton->Bind(wxEVT_BUTTON, &App::OnBBCNews, this);
+        SkyButton->Bind(wxEVT_BUTTON, &App::OnSkyNews, this);
 		sizer->Add(timeBox, 0, wxALIGN_CENTER | wxALL, 2);
         newsSelector->Add(SkyButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(BBCButton, 0, wxALIGN_CENTER | wxALL, 5);
@@ -97,7 +99,26 @@ public:
         textBox->SetValue("Now refreshing... \n");
         wxYield();
         textBox->SetValue(NewsReader());
+        end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
+        
     }
+
+    void OnBBCNews(wxCommandEvent&) {
+        textBox->SetValue("Now refreshing... \n");
+        wxYield();
+        textBox->SetValue(NewsReader());
+        end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
+    }
+
+    void OnSkyNews(wxCommandEvent&) {
+        textBox->SetValue("Now refreshing...\n");
+        wxYield();
+        textBox->SetValue(SkyNewsReader());
+        end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
+	}
 
     wxString NewsReader() {
         // cURL initialisation
@@ -109,7 +130,7 @@ public:
 
         //cURL settings
         std::string xml_data;
-        curl_easy_setopt(curl, CURLOPT_URL, "https://feeds.bbci.co.uk/news/rss.xml?edition=uk");
+        curl_easy_setopt(curl, CURLOPT_URL, R"(https://feeds.bbci.co.uk/news/rss.xml?edition=uk)");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &xml_data);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -151,8 +172,61 @@ public:
         return wxString(buffer.str());
     }
 
+    wxString SkyNewsReader() {
+        // cURL initialisation
+        CURL* curl = curl_easy_init();
+
+        if (!curl) {
+            return (stderr, "Failed to initialize cURL\n");
+        }
+
+        //cURL settings
+        std::string xml_data;
+        curl_easy_setopt(curl, CURLOPT_URL, R"(https://feeds.skynews.com/feeds/rss/uk.xml)");
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &xml_data);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        CURLcode base = curl_easy_perform(curl);
+
+        curl_easy_cleanup(curl);
+
+        if (base != CURLE_OK) {
+            fprintf(stderr, "failed to download: %s\n", curl_easy_strerror(base));
+        }
+
+        if (xml_data.empty()) {
+            return "No data downloaded...";
+        }
+
+        // create pugi document
+        pugi::xml_document doc;
+        // extracts from news.xml
+        if (!doc.load_string(xml_data.c_str())) {
+            return "Failed to parse XML data.";
+        }
+
+
+        // create buffer
+        std::stringstream buffer;
+
+        // parse XML and populate buffer
+        // pugi::xml_parse_result result = doc.load_file("news.xml"));
+        for (auto item : doc.child("rss").child("channel").children("item")) {
+            buffer << item.child("title").text().get() << "\n";
+            buffer << item.child("link").text().get() << "\n";
+            buffer << item.child("description").text().get() << "\n";
+            buffer << item.child("pubDate").text().get() << "\n";
+            buffer << "-------------------------------------------------\n";
+
+	}
+        return wxString(buffer.str());
+	}
+
 private:
     wxTextCtrl* textBox = nullptr;
+	wxTextCtrl* timeBox = nullptr;
+    std::time_t end_time;
 };
 
 wxIMPLEMENT_APP(App);
