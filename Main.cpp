@@ -6,6 +6,7 @@
 // --------------------------------------------------------------------------------------------------------------------------------
 
 #include <wx/wx.h>
+#include <wx/listctrl.h>
 #include <wx/event.h>
 #include <chrono>
 #include <ctime>
@@ -33,7 +34,6 @@ public:
         std::chrono::duration<double> elapsed_seconds = end - start;
         end_time = std::chrono::system_clock::to_time_t(end);
 
-
         wxString news = NewsReader();
         wxString output("Welcome to News!\nDownloading News... \n <-------------------------------------------------> \n" + news);
         // Prints time string
@@ -56,6 +56,7 @@ public:
             wxDefaultPosition, wxDefaultSize,
             wxTE_MULTILINE | wxTE_READONLY | wxHSCROLL
         );
+
 
         timeBox = new wxTextCtrl(
             panel, wxID_ANY, timeData,
@@ -87,7 +88,7 @@ public:
         newsSelector->Add(SkyButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(BBCButton, 0, wxALIGN_CENTER | wxALL, 5);
         sizer->Add(newsSelector, 0, wxALIGN_CENTER | wxALL, 5);
-        sizer->Add(textBox, 1, wxEXPAND | wxALL, 5);
+        sizer->Add(textBox, 1, wxEXPAND | wxALL | wxTE_RICH | wxTE_AUTO_URL, 5);
         sizer->Add(button, 0, wxALIGN_CENTER | wxALL, 5);
         panel->SetSizer(sizer);
         window->Show();
@@ -98,10 +99,18 @@ public:
     void OnRefresh(wxCommandEvent&) {
         textBox->SetValue("Now refreshing... \n");
         wxYield();
-        textBox->SetValue(NewsReader());
+
+        // Checks which news station is currently selected and refreshes the presently selected station
+            if (isSelected == "BBC News") {
+                textBox->SetValue(NewsReader());
+            } else if (isSelected == "Sky News") {
+                textBox->SetValue(SkyNewsReader());
+            } else {
+                textBox->SetValue(NewsReader());
+            }
+
         end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
-        
     }
 
     void OnBBCNews(wxCommandEvent&) {
@@ -110,6 +119,9 @@ public:
         textBox->SetValue(NewsReader());
         end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
+
+        // Stores the currently selected news station in a variable for the OnRefresh function
+        isSelected = "BBC News";
     }
 
     void OnSkyNews(wxCommandEvent&) {
@@ -118,6 +130,9 @@ public:
         textBox->SetValue(SkyNewsReader());
         end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
+
+        // Stores the currently selected news station in a variable for the OnRefresh function
+        isSelected = "Sky News";
 	}
 
     wxString NewsReader() {
@@ -153,7 +168,6 @@ public:
         if (!doc.load_string(xml_data.c_str())) {
             return "Failed to parse XML data.";
         }
-        
 
         // create buffer
         std::stringstream buffer;
@@ -166,8 +180,6 @@ public:
             buffer << item.child("description").text().get() << "\n";
             buffer << item.child("pubDate").text().get() << "\n";
             buffer << "-------------------------------------------------\n";
-
-            
         }
         return wxString(buffer.str());
     }
@@ -218,15 +230,15 @@ public:
             buffer << item.child("description").text().get() << "\n";
             buffer << item.child("pubDate").text().get() << "\n";
             buffer << "-------------------------------------------------\n";
-
 	}
         return wxString(buffer.str());
-	}
+}
 
 private:
     wxTextCtrl* textBox = nullptr;
 	wxTextCtrl* timeBox = nullptr;
     std::time_t end_time;
+    std::string isSelected = "";
 };
 
 wxIMPLEMENT_APP(App);
