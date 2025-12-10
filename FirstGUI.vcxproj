@@ -148,6 +148,10 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\..\..\..\Downloads\icon.ico" />
+    <Image Include="external\images\favicon.ico" />
+    <Image Include="external\images\icon.ico" />
+    <Image Include="external\images\icon.png" />
+    <Image Include="icon1.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

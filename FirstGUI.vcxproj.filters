@@ -42,5 +42,17 @@
     <Image Include="..\..\..\..\Downloads\icon.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="external\images\icon.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icon1.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="external\images\icon.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="external\images\favicon.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
