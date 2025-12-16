@@ -57,7 +57,6 @@ public:
             wxTE_MULTILINE | wxTE_READONLY | wxHSCROLL
         );
 
-
         timeBox = new wxTextCtrl(
             panel, wxID_ANY, timeData,
             wxPoint(10, 550), wxSize(200, 25),
@@ -81,6 +80,10 @@ public:
             panel, wxID_ANY, "Financial Times"
         );
 
+        wxButton* ReutersButton = new wxButton(
+            panel, wxID_ANY, "Reuters News"
+		);
+
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
         wxBoxSizer* newsSelector = new wxBoxSizer(wxHORIZONTAL);
 
@@ -88,10 +91,12 @@ public:
 		BBCButton->Bind(wxEVT_BUTTON, &App::OnBBCNews, this);
         SkyButton->Bind(wxEVT_BUTTON, &App::OnSkyNews, this);
         FTButton->Bind(wxEVT_BUTTON, &App::OnFinancialTimes, this);
+		ReutersButton->Bind(wxEVT_BUTTON, &App::OnReutersNews, this);
 		sizer->Add(timeBox, 0, wxALIGN_CENTER | wxALL, 2);
         newsSelector->Add(SkyButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(BBCButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(FTButton, 0, wxALIGN_CENTER | wxALL, 5);
+		newsSelector->Add(ReutersButton, 0, wxALIGN_CENTER | wxALL, 5);
         sizer->Add(newsSelector, 0, wxALIGN_CENTER | wxALL, 5);
         sizer->Add(textBox, 1, wxEXPAND | wxALL | wxTE_RICH | wxTE_AUTO_URL, 5);
         sizer->Add(button, 0, wxALIGN_CENTER | wxALL, 5);
@@ -152,6 +157,17 @@ public:
         
         // Stores the curretly selected news station in a variable for the OnRefresh function
         isSelected = "Financial Times";
+    }
+
+    void OnReutersNews(wxCommandEvent&) {
+		textBox->SetValue("Now refreshing...\n");
+        wxYield();
+		textBox->SetValue(ReutersReader());
+		end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
+
+		// Stores the curretly selected news station in a variable for the OnRefresh function
+		isSelected = "Reuters News";
     }
 
     wxString NewsReader() {
@@ -301,6 +317,63 @@ public:
 			pugi::xml_node news = url.child("news:news");
             if (!news) continue;
             
+            buffer << news.child("news:title").text().get() << "\n";
+            buffer << news.child("news:publication_date").text().get() << "\n";
+            buffer << news.child("news:title").text().get() << "\n";
+            buffer << news.child("news:keywords").text().get() << "\n";
+            buffer << "-------------------------------------------------\n";
+        }
+        return wxString(buffer.str());
+    }
+
+    wxString ReutersReader() {
+        // cURL initialisation
+        CURL* curl = curl_easy_init();
+
+        if (!curl) {
+            return (stderr, "Failed to initialize cURL\n");
+        }
+
+        //cURL settings
+        std::string xml_data;
+        curl_easy_setopt(curl, CURLOPT_URL, R"(https://www.reuters.com/graphics/sitemap.xml)");
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &xml_data);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        CURLcode base = curl_easy_perform(curl);
+
+        curl_easy_cleanup(curl);
+
+        if (base != CURLE_OK) {
+            fprintf(stderr, "failed to download: %s\n", curl_easy_strerror(base));
+        }
+
+        if (xml_data.empty()) {
+            return "No data downloaded...";
+        }
+
+        // create pugi document
+        pugi::xml_document doc;
+        // extracts from news.xml
+        if (!doc.load_string(xml_data.c_str())) {
+            return "Failed to parse XML data.";
+        }
+
+
+        // create buffer
+        std::stringstream buffer;
+
+        // parse XML and populate buffer
+        // pugi::xml_parse_result result = doc.load_file("news.xml"));
+        for (pugi::xml_node url : doc.child("urlset").children("url")) {
+
+            // Financial times doesn't use typical XML, and instead uses a unique RSS feed. Requires a new method of parsing.
+            buffer << url.child("lock").text().get() << "\n";
+
+            pugi::xml_node news = url.child("news:news");
+            if (!news) continue;
+
             buffer << news.child("news:title").text().get() << "\n";
             buffer << news.child("news:publication_date").text().get() << "\n";
             buffer << news.child("news:title").text().get() << "\n";
