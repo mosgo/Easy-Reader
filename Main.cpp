@@ -8,6 +8,7 @@
 #include <wx/wx.h>
 #include <wx/listctrl.h>
 #include <wx/event.h>
+#include <wx/srchctrl.h>
 #include <chrono>
 #include <ctime>
 #include "pugixml.hpp"
@@ -86,12 +87,22 @@ public:
 
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
         wxBoxSizer* newsSelector = new wxBoxSizer(wxHORIZONTAL);
+        m_fullText = textBox->GetValue();
+        
+        search = new wxSearchCtrl(
+            panel, wxID_ANY, "",
+            wxDefaultPosition, wxDefaultSize,
+            wxTE_PROCESS_ENTER
+		);
 
+
+		// Binding and initialisation
         button->Bind(wxEVT_BUTTON, &App::OnRefresh, this);
 		BBCButton->Bind(wxEVT_BUTTON, &App::OnBBCNews, this);
         SkyButton->Bind(wxEVT_BUTTON, &App::OnSkyNews, this);
         FTButton->Bind(wxEVT_BUTTON, &App::OnFinancialTimes, this);
 		ReutersButton->Bind(wxEVT_BUTTON, &App::OnReutersNews, this);
+		search->Bind(wxEVT_SEARCHCTRL_SEARCH_BTN, &App::OnSearch, this);
 		sizer->Add(timeBox, 0, wxALIGN_CENTER | wxALL, 2);
         newsSelector->Add(SkyButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(BBCButton, 0, wxALIGN_CENTER | wxALL, 5);
@@ -100,6 +111,7 @@ public:
         sizer->Add(newsSelector, 0, wxALIGN_CENTER | wxALL, 5);
         sizer->Add(textBox, 1, wxEXPAND | wxALL | wxTE_RICH | wxTE_AUTO_URL, 5);
         sizer->Add(button, 0, wxALIGN_CENTER | wxALL, 5);
+		sizer->Add(search, 0, wxEXPAND | wxALL, 5);
         panel->SetSizer(sizer);
         window->Show();
 
@@ -115,8 +127,7 @@ public:
                 textBox->SetValue(NewsReader());
             } else if (isSelected == "Sky News") {
                 textBox->SetValue(SkyNewsReader());
-            }
-            else if (isSelected == "Financial Times") {
+            } else if (isSelected == "Financial Times") {
                 textBox->SetValue(FTReader());
             } else {
                 textBox->SetValue(NewsReader());
@@ -168,6 +179,40 @@ public:
 
 		// Stores the curretly selected news station in a variable for the OnRefresh function
 		isSelected = "Reuters News";
+    }
+
+    void OnSearch(wxCommandEvent& event) {
+        wxString query = event.GetString().Lower();
+
+        if (query.IsEmpty()) {
+            return;
+        }
+
+        wxString filtered;
+        wxArrayString lines = wxSplit(m_fullText, '\n');
+
+        bool keepBlock = false;
+
+        for (const wxString& line : lines) {
+            if (line.Lower().Contains(query)) {
+                keepBlock = true;
+
+                if (keepBlock) {
+                    filtered += line + "\n";
+                    if (line.StartsWith("-------------------------------------------------")) {
+                        keepBlock = false;
+                    }
+                    textBox->Freeze();
+                    textBox->SetValue(filtered);
+                    textBox->Thaw();
+                }
+                if (filtered.IsEmpty())
+                {
+                    filtered = "No results found for " + query;
+                    textBox->SetValue(filtered);
+                };
+            }
+        }
     }
 
     wxString NewsReader() {
@@ -253,12 +298,9 @@ public:
             return "Failed to parse XML data.";
         }
 
-
         // create buffer
         std::stringstream buffer;
 
-        // parse XML and populate buffer
-        // pugi::xml_parse_result result = doc.load_file("news.xml"));
         for (auto item : doc.child("rss").child("channel").children("item")) {
             buffer << item.child("title").text().get() << "\n";
             buffer << item.child("link").text().get() << "\n";
@@ -303,15 +345,12 @@ public:
             return "Failed to parse XML data.";
         }
 
-
         // create buffer
         std::stringstream buffer;
 
-        // parse XML and populate buffer
-        // pugi::xml_parse_result result = doc.load_file("news.xml"));
         for (pugi::xml_node url : doc.child("urlset").children("url")) {
 			
-            // Financial times doesn't use typical XML, and instead uses a unique RSS feed. Requires a new method of parsing.
+            // Financial times doesn't use typical XML, and instead uses a unique RSS feed. Requires an alternative method of parsing.
             buffer << url.child("lock").text().get() << "\n";
 
 			pugi::xml_node news = url.child("news:news");
@@ -364,8 +403,6 @@ public:
         // create buffer
         std::stringstream buffer;
 
-        // parse XML and populate buffer
-        // pugi::xml_parse_result result = doc.load_file("news.xml"));
         for (pugi::xml_node url : doc.child("urlset").children("url")) {
 
             // Financial times doesn't use typical XML, and instead uses a unique RSS feed. Requires a new method of parsing.
@@ -386,8 +423,11 @@ public:
 private:
     wxTextCtrl* textBox = nullptr;
 	wxTextCtrl* timeBox = nullptr;
+	wxSearchCtrl* searchBtn = nullptr;
+	wxSearchCtrl* search = nullptr;
     std::time_t end_time;
     std::string isSelected = "";
+    wxString m_fullText;
 };
 
 wxIMPLEMENT_APP(App);
