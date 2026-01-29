@@ -30,7 +30,6 @@ class App : public wxApp {
 public:
     bool OnInit() {
         // Chrono con
-
         auto start = std::chrono::system_clock::now();
         auto end = std::chrono::system_clock::now();
 
@@ -52,7 +51,6 @@ public:
             nullptr, wxID_ANY, "News Reader", wxDefaultPosition, wxSize(1280, 720)
         );
 
-       
         wxPanel* panel = new wxPanel(window, wxID_ANY);
 
         richTextBox = new wxRichTextCtrl(
@@ -71,6 +69,12 @@ public:
 
         timeBox = new wxTextCtrl(
             panel, wxID_ANY, timeData,
+            wxPoint(10, 550), wxSize(200, 25),
+            wxTE_MULTILINE | wxTE_READONLY
+        );
+
+        downloadTime = new wxTextCtrl(
+            panel, wxID_ANY, wxString::Format("%lld", static_cast<long long>(end_time)),
             wxPoint(10, 550), wxSize(200, 25),
             wxTE_MULTILINE | wxTE_READONLY
         );
@@ -106,15 +110,32 @@ public:
             wxTE_PROCESS_ENTER
 		);
 
+        wxArrayString lines = wxSplit(news, '\n');
+        for (size_t i = 0; i < lines.size(); i++) {
+            wxString line = lines[i];
 
+            if (line.StartsWith("http")) {
+                richTextBox->BeginURL(line);
+                richTextBox->WriteText(line + "\n");
+                richTextBox->EndURL();
+            }
+            else if (!line.IsEmpty()) {
+                richTextBox->WriteText(line + "\n");
+            }
+            else
+            {
+				richTextBox->WriteText("\n");
+            }
+        };
 		// Binding and initialisation
         button->Bind(wxEVT_BUTTON, &App::OnRefresh, this);
 		BBCButton->Bind(wxEVT_BUTTON, &App::OnBBCNews, this);
         SkyButton->Bind(wxEVT_BUTTON, &App::OnSkyNews, this);
         FTButton->Bind(wxEVT_BUTTON, &App::OnFinancialTimes, this);
-		 ReutersButton->Bind(wxEVT_BUTTON, &App::OnReutersNews, this);
+		ReutersButton->Bind(wxEVT_BUTTON, &App::OnReutersNews, this);
 		search->Bind(wxEVT_SEARCHCTRL_SEARCH_BTN, &App::OnSearch, this);
 		sizer->Add(timeBox, 0, wxALIGN_CENTER | wxALL, 2);
+        sizer->Add(downloadTime, 0, wxALIGN_CENTER | wxALL, 2);
         newsSelector->Add(SkyButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(BBCButton, 0, wxALIGN_CENTER | wxALL, 5);
         newsSelector->Add(FTButton, 0, wxALIGN_CENTER | wxALL, 5);
@@ -182,16 +203,7 @@ public:
 				richTextBox->WriteText("\n");
             }
         };
-        /*
-        wxRichTextAttr boldAttr;
-        boldAttr.SetFontWeight(wxFONTWEIGHT_BOLD);
-        richTextBox->BeginStyle(boldAttr);
-        richTextBox->Clear();
-        richTextBox->WriteText("Now refreshing...\n");
-        richTextBox->EndStyle();
-        wxYield();
-        richTextBox->SetValue(NewsReader());
-        */
+  
         end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         timeBox->SetValue(wxString(std::ctime(&end_time)) + "\n");
 
@@ -358,6 +370,7 @@ public:
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         CURLcode base = curl_easy_perform(curl);
 
+        // clean up curl
         curl_easy_cleanup(curl);
 
         if (base != CURLE_OK) {
@@ -499,6 +512,7 @@ public:
 
 private:
     wxTextCtrl* textBox = nullptr;
+    wxTextCtrl* downloadTime = nullptr;
 	void LinkClick(wxTextUrlEvent& event);
 	wxTextCtrl* timeBox = nullptr;
 	wxRichTextCtrl* richTextBox = nullptr;
